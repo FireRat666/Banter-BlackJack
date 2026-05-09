@@ -41,7 +41,7 @@
             if (this.params.debug) console.log("[Blackjack]", ...args);
         }
 
-        playSound(soundFile) {
+        playLocalSound(soundFile) {
             if (this.isMuted || !soundFile) return;
             const audio = new Audio(`${DOMAIN}Assets/${soundFile}`);
             audio.crossOrigin = "anonymous";
@@ -465,7 +465,13 @@
             try {
                 const newState = raw ? JSON.parse(raw) : this.getDefaultState();
                 if (JSON.stringify(this.gameState) !== JSON.stringify(newState)) {
+                    const oldSound = this.gameState ? this.gameState.lastSound : null;
                     this.gameState = newState;
+                    
+                    if (this.gameState.lastSound && (!oldSound || this.gameState.lastSound.ts !== oldSound.ts)) {
+                        this.playLocalSound(this.gameState.lastSound.file);
+                    }
+
                     this.updateUI();
                 }
             } catch (e) {
@@ -489,6 +495,7 @@
                 currentHostUid: null,
                 winnerSummary: "",
                 advancedSettings: { doubleDown: true, split: true },
+                lastSound: null,
                 history: []
             };
         }
@@ -575,6 +582,12 @@
 
             const newState = this.handleAction(state, uid, type, data);
             if (newState) {
+                // If the host triggered a sound, sync it
+                if (newState._triggerSound) {
+                    newState.lastSound = { file: newState._triggerSound, ts: Date.now() };
+                    delete newState._triggerSound;
+                }
+                
                 await scene.SetPublicSpaceProps({ [STATE_KEY]: JSON.stringify(newState) });
                 this.sync();
             }
@@ -588,14 +601,14 @@
                 if (Object.keys(state.players).length < MAX_PLAYERS && !player) {
                     const pos = [0, 1, 2, 3, 4, 5, 6].find(p => !Object.values(state.players).some(pl => pl.position === p));
                     state.players[senderUid] = { uid: senderUid, position: pos, hand: [], status: 'waiting', trophies: 0, connected: true, disconnectTime: 0, chips: 1000, bet: 10 };
-                    this.playSound("playerJoin.ogg");
+                    this.playSound(state, "playerJoin.ogg");
                 }
             } else if (type === "adjust-bet" && player) {
                 if (!state.gameStarted) {
                     player.bet += data.amount;
                     if (player.bet < 10) player.bet = 10;
                     if (player.bet > player.chips) player.bet = player.chips;
-                    this.playSound("card_flick.ogg");
+                    this.playSound(state, "card_flick.ogg");
                 }
             } else if (type === "start") {
                 if (Object.keys(state.players).length >= MIN_PLAYERS) {
@@ -621,11 +634,11 @@
                     state.gameStarted = true;
                     state.currentPlayerId = Object.keys(state.players)[0];
                     state.turnStartTime = Date.now();
-                    this.playSound("gameStart.ogg");
+                    this.playSound(state, "gameStart.ogg");
                 }
             } else if (type === "leave") {
                 delete state.players[senderUid];
-                this.playSound("playerKick.ogg");
+                this.playSound(state, "playerKick.ogg");
                 if (state.currentPlayerId === senderUid) {
                     this.nextTurn(state);
                 }
@@ -633,7 +646,7 @@
                 if (state.currentPlayerId === senderUid) {
                     const activeHand = player.activeHandIndex === 2 ? player.splitHand : player.hand;
                     activeHand.push(state.deck.pop());
-                    this.playSound("card_flick.ogg");
+                    this.playSound(state, "card_flick.ogg");
                     if (this.calculateHandValue(activeHand) > 21) {
                         if (player.activeHandIndex === 1 && player.splitHand) {
                             player.activeHandIndex = 2;
@@ -648,7 +661,7 @@
                 }
             } else if (player && type === "stand") {
                 if (state.currentPlayerId === senderUid) {
-                    this.playSound("card_flick.ogg");
+                    this.playSound(state, "card_flick.ogg");
                     if (player.activeHandIndex === 1 && player.splitHand) {
                         player.activeHandIndex = 2;
                         state.turnStartTime = Date.now();
@@ -663,7 +676,7 @@
                     if (activeHand.length === 2 && player.chips >= player.bet) {
                         player.chips -= player.bet;
                         activeHand.push(state.deck.pop());
-                        this.playSound("card_flick.ogg");
+                        this.playSound(state, "card_flick.ogg");
                         
                         if (player.activeHandIndex === 2) {
                             player.splitDoubled = true;
@@ -689,7 +702,7 @@
                         player.splitHand.push(state.deck.pop());
                         player.activeHandIndex = 1;
                         state.turnStartTime = Date.now();
-                        this.playSound("card_flick.ogg");
+                        this.playSound(state, "card_flick.ogg");
                     }
                 }
             } else if (!player && type === "stand" && state.currentPlayerId === senderUid) {
@@ -774,12 +787,12 @@
             }
             if (winners.length > 0) {
                 state.winnerSummary = "WINNERS: " + winners.join(", ");
-                this.playSound("fanfare with pop.ogg");
+                this.playSound(state, "fanfare with pop.ogg");
             } else if (dealerVal <= 21) {
                 state.winnerSummary = `DEALER WINS (${dealerVal})`;
             } else {
                 state.winnerSummary = "EVERYONE WINS! (Dealer Bust)";
-                this.playSound("fanfare with pop.ogg");
+                this.playSound(state, "fanfare with pop.ogg");
             }
         }
 
@@ -986,6 +999,10 @@
         }
 
 
+
+        playSound(state, soundFile) {
+            state._triggerSound = soundFile;
+        }
 
         renderHand(container, hand, showAll) {
             // Simple label-based card rendering for now
