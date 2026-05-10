@@ -19,6 +19,7 @@
             this.isConfirmationDialogOpen = false;
             this.confirmCallback = null;
             this.isMuted = false;
+            this.playersInitiallyLoaded = {}; // Track initial connected state for sound suppression
 
             const urlParams = new URLSearchParams(window.location.search);
             const getParam = (attr, defaultValue) => {
@@ -472,6 +473,12 @@
                         this.playLocalSound(this.gameState.lastSound.file);
                     }
 
+                    // Populate playersInitiallyLoaded based on the newly synced state
+                    this.playersInitiallyLoaded = {};
+                    for (const playerId in this.gameState.players) {
+                        this.playersInitiallyLoaded[playerId] = this.gameState.players[playerId].connected;
+                    }
+
                     this.updateUI();
                 }
             } catch (e) {
@@ -479,6 +486,7 @@
                 // If it fails to parse, initialize with default to recover
                 if (!this.gameState) {
                     this.gameState = this.getDefaultState();
+                    this.playersInitiallyLoaded = {}; // Clear if state is reset
                     this.updateUI();
                 }
             }
@@ -638,7 +646,9 @@
                 }
             } else if (type === "leave") {
                 delete state.players[senderUid];
-                this.playSound(state, "playerKick.ogg");
+                if (data.playSound !== false) { // Only play sound if explicitly not false
+                    this.playSound(state, "playerKick.ogg");
+                }
                 if (state.currentPlayerId === senderUid) {
                     this.nextTurn(state);
                 }
@@ -825,7 +835,11 @@
                         
                         if (!isConnected && p.disconnectTime > 0 && (now - p.disconnectTime > DISCONNECT_TIMEOUT_MS)) {
                             this.log(`Kicking ${uid} for disconnect.`);
-                            this.handleAction(this.gameState, uid, "leave", {});
+                            // Determine if sound should be played:
+                            // Play sound if the player was NOT disconnected when the state was initially loaded.
+                            const wasInitiallyConnected = this.playersInitiallyLoaded.hasOwnProperty(uid) && this.playersInitiallyLoaded[uid];
+                            const playSound = wasInitiallyConnected; // If they were connected initially, and now disconnected, play sound
+                            this.handleAction(this.gameState, uid, "leave", { playSound: playSound });
                             changed = true;
                         }
                     }
