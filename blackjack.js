@@ -443,7 +443,7 @@
 
             const creditLabel = panel.CreateLabel(undefined, rootEl);
             await creditLabel.Async();
-            creditLabel.text = "This game is based on previous works:\nOriginal \"Holograms Against Humanity\"\nDerogatory, falkrons, schmidtec, Shane\nPorted to the Modern Banter SDK by FireRat\nBeta 0.2";
+            creditLabel.text = "This game is based on previous works:\nOriginal \"Holograms Against Humanity\"\nDerogatory, falkrons, schmidtec, Shane\nPorted to the Modern Banter SDK by FireRat\nBeta 0.2.1";
             creditLabel.SetStyles({ color: '#aaaaaa', fontSize: '24px', marginTop: '30px', textAlign: 'center', backgroundColor: 'rgba(0,0,0,0)' });
             this.ui.creditLabel = creditLabel;
 
