@@ -3,7 +3,7 @@
     let currentScript = document.currentScript;
 
     const MAX_PLAYERS = 7;
-    let STATE_KEY = "blackjack_game";
+    // Removed: let STATE_KEY = "blackjack_game";
     const MIN_PLAYERS = 1;
     const TURN_DURATION = 60 * 1000;
     const DISCONNECT_TIMEOUT_MS = 45000;
@@ -35,7 +35,7 @@
                 instance: getParam("instance", "blackjack_game"),
                 debug: getParam("debug", "false") === "true"
             };
-            STATE_KEY = this.params.instance;
+            this.stateKey = this.params.instance; // Changed STATE_KEY to this.stateKey
         }
 
         log(...args) {
@@ -462,7 +462,7 @@
 
         sync() {
             if (!scene || !scene.spaceState) return;
-            const raw = scene.spaceState.public[STATE_KEY];
+            const raw = scene.spaceState.public[this.stateKey]; // Changed STATE_KEY to this.stateKey
             try {
                 const newState = raw ? JSON.parse(raw) : this.getDefaultState();
                 if (JSON.stringify(this.gameState) !== JSON.stringify(newState)) {
@@ -511,12 +511,12 @@
         updateState(patch) {
             if (!this.gameState) return;
             Object.assign(this.gameState, patch);
-            scene.SetPublicSpaceProps({ [STATE_KEY]: JSON.stringify(this.gameState) });
+            scene.SetPublicSpaceProps({ [this.stateKey]: JSON.stringify(this.gameState) }); // Changed STATE_KEY to this.stateKey
             this.updateUI();
         }
 
         onSpaceStateChanged(e) {
-            if (e.detail.changes.some(c => c.property === STATE_KEY)) {
+            if (e.detail.changes.some(c => c.property === this.stateKey)) { // Changed STATE_KEY to this.stateKey
                 this.sync();
             }
         }
@@ -580,7 +580,7 @@
             if (!scene || !scene.spaceState) return;
             const uid = senderUid || scene.localUser.uid;
             
-            const raw = scene.spaceState.public[STATE_KEY];
+            const raw = scene.spaceState.public[this.stateKey]; // Changed STATE_KEY to this.stateKey
             let state;
             try {
                 state = raw ? JSON.parse(raw) : this.getDefaultState();
@@ -596,7 +596,7 @@
                     delete newState._triggerSound;
                 }
                 
-                await scene.SetPublicSpaceProps({ [STATE_KEY]: JSON.stringify(newState) });
+                await scene.SetPublicSpaceProps({ [this.stateKey]: JSON.stringify(newState) }); // Changed STATE_KEY to this.stateKey
                 this.sync();
             }
         }
