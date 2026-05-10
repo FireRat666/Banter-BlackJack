@@ -515,6 +515,13 @@
         updateState(patch) {
             if (!this.gameState) return;
             Object.assign(this.gameState, patch);
+
+            // If a sound was triggered during logic, sync it
+            if (this.gameState._triggerSound) {
+                this.gameState.lastSound = { file: this.gameState._triggerSound, ts: Date.now() };
+                delete this.gameState._triggerSound;
+            }
+
             scene.SetPublicSpaceProps({ [this.stateKey]: JSON.stringify(this.gameState) }); // Changed STATE_KEY to this.stateKey
             this.updateUI();
         }
