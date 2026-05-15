@@ -3,7 +3,6 @@
     let currentScript = document.currentScript;
 
     const MAX_PLAYERS = 7;
-    // Removed: let STATE_KEY = "blackjack_game";
     const MIN_PLAYERS = 1;
     const TURN_DURATION = 60 * 1000;
     const DISCONNECT_TIMEOUT_MS = 45000;
@@ -36,7 +35,7 @@
                 instance: getParam("instance", "blackjack_game"),
                 debug: getParam("debug", "false") === "true"
             };
-            this.stateKey = this.params.instance; // Changed STATE_KEY to this.stateKey
+            this.stateKey = this.params.instance;
         }
 
         log(...args) {
@@ -54,6 +53,24 @@
         parseVector3(str) {
             const parts = str.split(" ").map(parseFloat);
             return new BS.Vector3(parts[0] || 0, parts[1] || 0, parts[2] || 0);
+        }
+
+        // Returns the outline suit symbol — BMP characters, confirmed to render in Banter SDK
+        getSuitSymbol(suit) {
+            switch (suit) {
+                case 'hearts':   return '\u2661'; // ♡
+                case 'diamonds': return '\u25C7'; // ◇
+                case 'clubs':    return '\u2667'; // ♧
+                case 'spades':   return '\u2664'; // ♤
+                default: return '?';
+            }
+        }
+
+        // Returns the rank display string — chess glyphs for K and Q
+        getRankDisplay(rank) {
+            if (rank === 'K') return '\u2654'; // ♔
+            if (rank === 'Q') return '\u2655'; // ♕
+            return rank;
         }
 
         async init() {
@@ -443,7 +460,7 @@
 
             const creditLabel = panel.CreateLabel(undefined, rootEl);
             await creditLabel.Async();
-            creditLabel.text = "This game is based on previous works:\nOriginal \"Holograms Against Humanity\"\nDerogatory, falkrons, schmidtec, Shane\nPorted to the Modern Banter SDK by FireRat\nBeta 0.2.1";
+            creditLabel.text = "This game is based on previous works:\nOriginal \"Holograms Against Humanity\"\nDerogatory, falkrons, schmidtec, Shane\nPorted to the Modern Banter SDK by FireRat\nBeta v0.3.0";
             creditLabel.SetStyles({ color: '#aaaaaa', fontSize: '24px', marginTop: '30px', textAlign: 'center', backgroundColor: 'rgba(0,0,0,0)' });
             this.ui.creditLabel = creditLabel;
 
@@ -463,7 +480,7 @@
 
         sync() {
             if (!scene || !scene.spaceState) return;
-            const raw = scene.spaceState.public[this.stateKey]; // Changed STATE_KEY to this.stateKey
+            const raw = scene.spaceState.public[this.stateKey];
             try {
                 const newState = raw ? JSON.parse(raw) : this.getDefaultState();
                 if (JSON.stringify(this.gameState) !== JSON.stringify(newState)) {
@@ -522,12 +539,12 @@
                 delete this.gameState._triggerSound;
             }
 
-            scene.SetPublicSpaceProps({ [this.stateKey]: JSON.stringify(this.gameState) }); // Changed STATE_KEY to this.stateKey
+            scene.SetPublicSpaceProps({ [this.stateKey]: JSON.stringify(this.gameState) });
             this.updateUI();
         }
 
         onSpaceStateChanged(e) {
-            if (e.detail.changes.some(c => c.property === this.stateKey)) { // Changed STATE_KEY to this.stateKey
+            if (e.detail.changes.some(c => c.property === this.stateKey)) {
                 this.sync();
             }
         }
@@ -591,7 +608,7 @@
             if (!scene || !scene.spaceState) return;
             const uid = senderUid || scene.localUser.uid;
             
-            const raw = scene.spaceState.public[this.stateKey]; // Changed STATE_KEY to this.stateKey
+            const raw = scene.spaceState.public[this.stateKey];
             let state;
             try {
                 state = raw ? JSON.parse(raw) : this.getDefaultState();
@@ -607,7 +624,7 @@
                     delete newState._triggerSound;
                 }
                 
-                await scene.SetPublicSpaceProps({ [this.stateKey]: JSON.stringify(newState) }); // Changed STATE_KEY to this.stateKey
+                await scene.SetPublicSpaceProps({ [this.stateKey]: JSON.stringify(newState) });
                 this.sync();
             }
         }
@@ -1030,7 +1047,6 @@
         }
 
         renderHand(container, hand, showAll) {
-            // Simple label-based card rendering for now
             if (container.children) {
                 while (container.children.length > 0) {
                     container.RemoveChild(container.children[0]);
@@ -1038,22 +1054,46 @@
             }
             hand.forEach((card, idx) => {
                 const isHidden = !showAll && idx === 1;
+                const isRed = ['hearts', 'diamonds'].includes(card.suit);
                 const cardEl = container.panel.CreateLabel(undefined, container);
                 cardEl.Async().then(() => {
-                    cardEl.text = isHidden ? "??" : `${card.rank}\n${card.suit}`;
-                    cardEl.SetStyles({
-                        width: '170px',
-                        height: '180px',
-                        backgroundColor: isHidden ? '#333' : 'white',
-                        color: isHidden ? 'white' : (['hearts', 'diamonds'].includes(card.suit) ? 'red' : 'black'),
-                        fontSize: '28px',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        borderRadius: '10px',
-                        marginRight: '10px',
-                        paddingTop: '15px',
-                        paddingBottom: '30px'
-                    });
+                    if (isHidden) {
+                        // Card back — filled suit grid pattern on navy
+                        cardEl.text = '\u2664\u25C7\n\u2667\u2661'; // ♤◇ / ♧♡
+                        cardEl.SetStyles({
+                            width: '130px',
+                            height: '175px',
+                            backgroundColor: 'rgba(8, 13, 67, 1)',
+                            color: 'rgba(252, 202, 38, 0.91)',
+                            fontSize: '46px',
+                            fontWeight: 'bold',
+                            textAlign: 'center',
+                            borderRadius: '12px',
+                            marginRight: '10px',
+                            paddingTop: '10px',
+                            borderWidth: '3px',
+                            borderColor: 'rgba(255, 220, 100, 0.4)'
+                        });
+                    } else {
+                        // Card face — rank on top line, outline suit symbol on bottom
+                        const rank = this.getRankDisplay(card.rank);
+                        const suit = this.getSuitSymbol(card.suit);
+                        cardEl.text = rank + '\n' + suit;
+                        cardEl.SetStyles({
+                            width: '130px',
+                            height: '175px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                            color: isRed ? 'rgba(143, 0, 0, 1)' : 'rgba(0, 0, 0, 1)',
+                            fontSize: '54px',
+                            // fontWeight: 'bold',
+                            textAlign: 'center',
+                            borderRadius: '12px',
+                            marginRight: '10px',
+                            paddingTop: '15px',
+                            borderWidth: '3px',
+                            borderColor: isRed ? 'rgba(143, 0, 0, 1)' : 'rgb(0, 0, 0, 1)'
+                        });
+                    }
                 });
             });
         }
